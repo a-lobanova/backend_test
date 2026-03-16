@@ -46,7 +46,7 @@ async def test_payment_manager_flow():
             payment_repo = PaymentRepository(db)
             bank_payment_repo = BankPaymentRepository(db)
             bank_client = FakeBankClient()
-            order_status_calculator = OrderStatusCalculator()
+            order_status_calculator = OrderStatusCalculator(order_repo, payment_repo)
             bank_sync_service = BankSyncService(
                 bank_payment_repo,
                 payment_repo,
@@ -70,6 +70,8 @@ async def test_payment_manager_flow():
             await db.flush()
             await db.refresh(order)
 
+            assert order.status == OrderPaymentStatus.UNPAID
+
             # --- CASH платеж ---
             payment1 = await manager.create_payment(order.id, 20, "CASH")
             await db.refresh(order)
@@ -83,8 +85,16 @@ async def test_payment_manager_flow():
             assert payment2.status == PaymentStatus.PENDING
             assert order.status == OrderPaymentStatus.PARTIALLY_PAID
 
-            # Получаем bank_payment_id для синхронизации
+            # --- Проверяем, что BankPayment был создан ---
             bank_payment = await bank_payment_repo.get_by_payment(payment2.id)
+            print(
+                f"BankPayment for payment {payment2.id}: status={bank_payment.status}, "
+                f"bank_payment_id={bank_payment.bank_payment_id}"
+            )
+            assert bank_payment is not None
+            assert bank_payment.status == "PENDING"
+
+            # bank_payment_id для синхронизации
             bank_client.set_status(bank_payment.bank_payment_id, "SUCCESS")
 
             # --- Синхронизация ACQUIRING платежа ---
@@ -99,13 +109,32 @@ async def test_payment_manager_flow():
             await db.refresh(order)
             await db.refresh(payment2)
             assert payment2.status == PaymentStatus.SUCCESS
-            assert (
-                order.status == OrderPaymentStatus.PARTIALLY_PAID
-                or order.status == OrderPaymentStatus.PAID
-            )
+            assert order.status == OrderPaymentStatus.PARTIALLY_PAID
 
-            # --- Попытка возврата ---
-            refund = await manager.refund_payment(order.id)
+            # --- Доплачиваем заказ до полной суммы ---
+            payment3 = await manager.create_payment(order.id, 50, "CASH")
             await db.refresh(order)
-            assert refund.status == PaymentStatus.SUCCESS
+
+            assert payment3.status == PaymentStatus.SUCCESS
+            assert order.status == OrderPaymentStatus.PAID
+
+            # ---  Возврат ---
+            refund3 = await manager.refund_payment(payment3.id)
+            await db.refresh(order)
+            assert refund3.status == PaymentStatus.SUCCESS
+
+            refund2 = await manager.refund_payment(payment2.id)
+            await db.refresh(order)
+            assert refund2.status == PaymentStatus.SUCCESS
+
+            refund1 = await manager.refund_payment(payment1.id)
+            await db.refresh(order)
+            assert refund1.status == PaymentStatus.SUCCESS
+
             assert order.status == OrderPaymentStatus.UNPAID
+
+            # --- Попытка вернуть уже возвращенный платеж ---
+            with pytest.raises(
+                Exception, match=f"Payment {payment1.id} already refunded"
+            ):
+                await manager.refund_payment(payment1.id)

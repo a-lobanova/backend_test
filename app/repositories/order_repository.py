@@ -24,3 +24,7 @@ class OrderRepository:
         await self.db.flush()
         await self.db.refresh(order)
         return order
+
+    async def list_all(self) -> list[Order]:
+        result = await self.db.execute(select(Order))
+        return result.scalars().all()

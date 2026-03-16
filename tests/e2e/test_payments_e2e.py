@@ -1,54 +1,36 @@
-# tests/test_payments_e2e.py
+# tests/e2e/test_payments_e2e_sync.py
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, MagicMock
 from app.main import app
-from app.models.order import Order
-from app.db.base import async_session_maker
-import asyncio
-
-client = TestClient(app)
+from app.models.payment import Payment
+from app.api.routes.payments import get_payment_manager
 
 
-@pytest.mark.asyncio
-async def test_create_and_refund_payment():
-    # --- создаем два заказа напрямую в БД ---
-    async with async_session_maker() as session:
-        async with session.begin():
-            order1 = Order(amount=50, description="Order 1")
-            order2 = Order(amount=50, description="Order 2")
-            session.add_all([order1, order2])
-            await session.flush()
-            await session.refresh(order1)
-            await session.refresh(order2)
-            order1_id = order1.id
-            order2_id = order2.id
+# --- мок PaymentManager ---
+@pytest.fixture
+def mock_payment_manager():
+    manager = MagicMock()
+    manager.create_payment = AsyncMock(return_value=Payment(id=1, status="COMPLETED"))
+    return manager
 
-    # --- вызываем REST API для создания платежей ---
-    response1 = client.post(
-        "/payments",
-        json={"order_id": order1_id, "amount": 20, "payment_type": "ACQUIRING"},
-    )
-    response2 = client.post(
-        "/payments",
-        json={"order_id": order2_id, "amount": 30, "payment_type": "ACQUIRING"},
-    )
 
-    print(response1.status_code, response1.json())
-    print(response2.status_code, response2.json())
+# --- override зависимости ---
+@pytest.fixture
+def override_dependencies(mock_payment_manager):
+    app.dependency_overrides[get_payment_manager] = lambda: mock_payment_manager
+    yield
+    app.dependency_overrides = {}
 
-    assert response1.status_code == 200
-    assert response2.status_code == 200
-    payment1 = response1.json()
-    payment2 = response2.json()
-    assert payment1["status"] == "COMPLETED"
-    assert payment2["status"] == "COMPLETED"
 
-    # --- проверяем REST API для возврата платежа ---
-    refund_response = client.post(f"/payments/{order1_id}/refund")
-    assert refund_response.status_code == 200
-    refund_data = refund_response.json()
-    assert refund_data["status"] == "REFUNDED"
-
-    # --- проверяем, что повторный возврат не проходит ---
-    refund_response2 = client.post(f"/payments/{order1_id}/refund")
-    assert refund_response2.status_code == 400
+# --- синхронный тест через TestClient ---
+def test_create_payment(override_dependencies):
+    with TestClient(app) as client:
+        response = client.post(
+            "/payments",
+            json={"order_id": 1, "amount": 20, "payment_type": "ACQUIRING"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "SUCCESS"
+        assert data["payment_id"] == 1

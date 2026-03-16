@@ -1,15 +1,16 @@
 # bank_api.py
 
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Literal
+from decimal import Decimal
 
 
 # --- acquiring_start ---
 class AcquiringStartRequest(BaseModel):
     order_id: int
-    amount: float
+    amount: Decimal = Field(example="100.00")
 
 
 class AcquiringStartResponse(BaseModel):
@@ -23,6 +24,6 @@ class AcquiringCheckRequest(BaseModel):
 
 class AcquiringCheckResponse(BaseModel):
     bank_payment_id: str
-    amount: float
+    amount: Decimal = Field(example="100.00")
     status: Literal["SUCCESS", "FAILED", "PENDING"]
     paid_at: datetime

@@ -1,21 +1,24 @@
-from app.models.order import OrderPaymentStatus
-from app.models.payment import PaymentStatus
+from decimal import Decimal
+from app.models.order import OrderPaymentStatus, Order
 
 
 class OrderStatusCalculator:
 
-    @staticmethod
-    async def calculate(order, payment_repo):
-        total_deposit = await payment_repo.sum_success_payments(order.id)
-        has_refund = await payment_repo.get_refund(order.id)
+    def __init__(self, order_repo, payment_repo):
+        self.order_repo = order_repo
+        self.payment_repo = payment_repo
 
-        if has_refund:
+    async def calculate(self, order: Order):
+
+        net_paid = await self.payment_repo.get_net_paid(order.id)
+
+        if net_paid == Decimal("0.00"):
             order.status = OrderPaymentStatus.UNPAID
-        elif total_deposit == 0:
-            order.status = OrderPaymentStatus.UNPAID
-        elif total_deposit < order.amount:
+        elif net_paid < order.amount:
             order.status = OrderPaymentStatus.PARTIALLY_PAID
         else:
             order.status = OrderPaymentStatus.PAID
 
-        await payment_repo.db.flush()
+        await self.order_repo.save(order)
+
+        return order

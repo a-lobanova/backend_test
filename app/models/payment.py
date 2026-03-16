@@ -21,7 +21,6 @@ class PaymentStatus(str, enum.Enum):
     PENDING = "PENDING"
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
-    REFUNDED = "REFUNDED"
 
 
 class Payment(Base):
@@ -35,6 +34,10 @@ class Payment(Base):
         Enum(PaymentOperation), nullable=False
     )
     status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus), nullable=False)
+    original_payment_id: Mapped[int] = mapped_column(
+        ForeignKey("payments.id"), nullable=True
+    )
+
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

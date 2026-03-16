@@ -5,7 +5,7 @@ from app.api.routes import payments, orders  # импортируем твои �
 app = FastAPI(title="Payment Service")
 
 # подключаем роутеры
-app.include_router(orders.router, prefix="/orders", tags=["orders"])
+app.include_router(orders.router, prefix="", tags=["orders"])
 app.include_router(payments.router, prefix="", tags=["payments"])  # роутеры платежей
 
 
