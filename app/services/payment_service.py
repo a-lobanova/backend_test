@@ -2,6 +2,9 @@
 # app/services/payment_service.py
 
 from app.managers.payment_manager import PaymentManager
+from app.repositories.order_repository import OrderRepository
+from app.repositories.payment_repository import PaymentRepository
+from app.repositories.bank_payment_repository import BankPaymentRepository
 from app.models.payment import Payment, PaymentOperation, PaymentStatus
 from app.models.bank_payment import BankPayment
 from app.services.bank_sync_service import BankSyncService
@@ -33,11 +36,16 @@ class PaymentService:
         # --- 1. Синхронизация банка (своя транзакция) ---
         async with self.session_factory() as session:
             async with session.begin():
+
+                order_repo = OrderRepository(session)
+                payment_repo = PaymentRepository(session)
+                bank_payment_repo = BankPaymentRepository(session)
+
                 bank_sync_service = BankSyncService(
-                    bank_payment_repo=self.bank_payment_repo,
-                    payment_repo=self.payment_repo,
+                    bank_payment_repo=bank_payment_repo,
+                    payment_repo=payment_repo,
                     bank_client=self.bank_client,
-                    order_repo=self.order_repo,
+                    order_repo=order_repo,
                     order_status_calculator=self.order_status_calculator,
                 )
                 await bank_sync_service.sync_pending_for_order(order_id)
@@ -45,13 +53,26 @@ class PaymentService:
         # --- 2. Создание нового платежа (своя транзакция) ---
         async with self.session_factory() as session:
             async with session.begin():
+
+                order_repo = OrderRepository(session)
+                payment_repo = PaymentRepository(session)
+                bank_payment_repo = BankPaymentRepository(session)
+
+                bank_sync_service = BankSyncService(
+                    bank_payment_repo=bank_payment_repo,
+                    payment_repo=payment_repo,
+                    bank_client=self.bank_client,
+                    order_repo=order_repo,
+                    order_status_calculator=self.order_status_calculator,
+                )
+
                 payment_manager = PaymentManager(
-                    order_repo=self.order_repo,
-                    payment_repo=self.payment_repo,
-                    bank_payment_repo=self.bank_payment_repo,
+                    order_repo=order_repo,
+                    payment_repo=payment_repo,
+                    bank_payment_repo=bank_payment_repo,
                     bank_client=self.bank_client,
                     order_status_calculator=self.order_status_calculator,
-                    bank_sync_service=bank_sync_service,  # если нужен
+                    bank_sync_service=bank_sync_service,
                 )
                 payment = await payment_manager.create_payment(
                     order_id, amount, payment_type
@@ -64,11 +85,15 @@ class PaymentService:
         # --- 1. синхронизация платежа с банком ---
         async with self.session_factory() as session:
             async with session.begin():
+                order_repo = OrderRepository(session)
+                payment_repo = PaymentRepository(session)
+                bank_payment_repo = BankPaymentRepository(session)
+
                 bank_sync_service = BankSyncService(
-                    bank_payment_repo=self.bank_payment_repo,
-                    payment_repo=self.payment_repo,
+                    bank_payment_repo=bank_payment_repo,
+                    payment_repo=payment_repo,
                     bank_client=self.bank_client,
-                    order_repo=self.order_repo,
+                    order_repo=order_repo,
                     order_status_calculator=self.order_status_calculator,
                 )
 
@@ -77,10 +102,22 @@ class PaymentService:
         # --- 2. создание возврата ---
         async with self.session_factory() as session:
             async with session.begin():
+
+                order_repo = OrderRepository(session)
+                payment_repo = PaymentRepository(session)
+                bank_payment_repo = BankPaymentRepository(session)
+
+                bank_sync_service = BankSyncService(
+                    bank_payment_repo=bank_payment_repo,
+                    payment_repo=payment_repo,
+                    bank_client=self.bank_client,
+                    order_repo=order_repo,
+                    order_status_calculator=self.order_status_calculator,
+                )
                 payment_manager = PaymentManager(
-                    order_repo=self.order_repo,
-                    payment_repo=self.payment_repo,
-                    bank_payment_repo=self.bank_payment_repo,
+                    order_repo=order_repo,
+                    payment_repo=payment_repo,
+                    bank_payment_repo=bank_payment_repo,
                     bank_client=self.bank_client,
                     order_status_calculator=self.order_status_calculator,
                     bank_sync_service=bank_sync_service,

@@ -20,6 +20,7 @@ async def create_order(
 ):
     order = Order(amount=request.amount, description=request.description)
     await order_repo.save(order)  # метод save() с flush+refresh внутри
+    await order_repo.db.commit()  # to do - OrderService
     return OrderResponse(
         id=order.id,
         amount=order.amount,
