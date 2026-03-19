@@ -10,7 +10,7 @@ from decimal import Decimal
 # --- acquiring_start ---
 class AcquiringStartRequest(BaseModel):
     order_id: int
-    amount: Decimal = Field(example="100.00")
+    amount: Decimal = Field(default=0, json_schema_extra={"example": "100.00"})
 
 
 class AcquiringStartResponse(BaseModel):
@@ -24,6 +24,6 @@ class AcquiringCheckRequest(BaseModel):
 
 class AcquiringCheckResponse(BaseModel):
     bank_payment_id: str
-    amount: Decimal = Field(example="100.00")
+    amount: Decimal = Field(default=0, json_schema_extra={"example": "100.00"})
     status: Literal["SUCCESS", "FAILED", "PENDING"]
     paid_at: datetime

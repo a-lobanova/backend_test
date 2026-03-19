@@ -12,6 +12,6 @@ class CreateOrderRequest(BaseModel):
 
 class OrderResponse(BaseModel):
     id: int
-    amount: Decimal = Field(example="100.00")
+    amount: Decimal = Field(default=0, json_schema_extra={"example": "100.00"})
     description: str
     status: OrderPaymentStatus

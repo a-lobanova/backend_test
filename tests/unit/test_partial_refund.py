@@ -3,7 +3,7 @@ import pytest
 from app.db.base import async_session_maker
 from app.models.order import Order, OrderPaymentStatus
 from app.models.payment import PaymentStatus, PaymentOperation
-from app.services.payment_manager import PaymentManager
+from app.managers.payment_manager import PaymentManager
 from app.services.bank_sync_service import BankSyncService
 from app.services.order_status_calculator import OrderStatusCalculator
 from app.repositories import OrderRepository, PaymentRepository, BankPaymentRepository
